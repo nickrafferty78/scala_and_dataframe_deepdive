@@ -57,7 +57,8 @@ object Playground extends App {
 
   /**
     * The two lines below create an RDD of rows (think of an RDD like a parallel collection).
-    * Then from the RDD we create a DataFrame, which has a number of useful querying methods.
+    * Then from the RDD we create a DataF
+    * rame, which has a number of useful querying methods.
     */
   val carsRows = sc.parallelize(cars)
   val carsDF = spark.createDataFrame(carsRows, carsSchema)
