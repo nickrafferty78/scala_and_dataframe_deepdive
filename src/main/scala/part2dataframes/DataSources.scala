@@ -2,6 +2,7 @@ package part2dataframes
 
 import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.functions._
 import part2dataframes.DataFramesBasics.{carsSchema, spark}
 
 object DataSources extends App {
@@ -96,16 +97,16 @@ object DataSources extends App {
     .show()
 
   //Reading from a remote Database
-  val employeesDf = spark.read
-    .format("jdbc")
-    .option("driver", "org.postgresql.Driver")
-    .option("url", "jdbc:postgresql://localhost:5432/rtjvm")
-    .option("user", "docker")
-    .option("password", "docker")
-    .option("dbtable", "public.employees")
-    .load()
+//  val employeesDf = spark.read
+//    .format("jdbc")
+//    .option("driver", "org.postgresql.Driver")
+//    .option("url", "jdbc:postgresql://localhost:5432/rtjvm")
+//    .option("user", "docker")
+//    .option("password", "docker")
+//    .option("dbtable", "public.employees")
+//    .load()
 
-  employeesDf.show()
+ // employeesDf.show()
 
   /**
     * Read movies dataframe - movies.json
@@ -141,20 +142,60 @@ object DataSources extends App {
     .load("src/main/resources/data/movies.json")
 
   movieDF.write
-    .csv("src/main/resources/data/movies.csv")
+    //.csv("src/main/resources/data/movies.csv")
 
   movieDF.write
-    .parquet("src/main/resources/data/movies.parquet")
+    //.parquet("src/main/resources/data/movies.parquet")
 
-  movieDF.write
-    .format("jdbc")
-    .option("driver", "org.postgresql.Driver")
-    .option("url", "jdbc:postgresql://localhost:5432/rtjvm")
-    .option("user", "docker")
-    .option("password", "docker")
-    .option("dbtable", "public.movies")
-    .save()
+//  movieDF.write
+//    .format("jdbc")
+//    .option("driver", "org.postgresql.Driver")
+//    .option("url", "jdbc:postgresql://localhost:5432/rtjvm")
+//    .option("user", "docker")
+//    .option("password", "docker")
+//    .option("dbtable", "public.movies")
+//    .save()
 
 
+  /**
+    * 1.Read movies df and select two columns of choice
+    * 2. Create a new df by summing up all gross profits - US dvd sales, us and world gross
+    * 3. Select all COMEDY movies with IMDB above 6
+    *
+    * Use as many versions as possible
+    */
+
+  val moviesDF = spark.read
+    .schema(moviesSchema)
+    .format("json")
+    .option("dateFormat", "dd-MMM-YY")
+    .load("src/main/resources/data/movies.json")
+  val newDF = moviesDF.select(col("Title"), col("Major_Genre"))
+  newDF.show()
+
+  //2.
+  val sumOfProfits = moviesDF.select(
+    col("Title"),
+    col("US_Gross"),
+    col("Worldwide_Gross"),
+    col("US_DVD_Sales"),
+    (col("US_Gross") + col("Worldwide_Gross")).as("TotalSales")
+  ).show(100)
+
+  val sumOfProfitsTwo = moviesDF.selectExpr(
+    "Title",
+    "US_Gross",
+    "WorldWide_Gross",
+    "US_Gross + Worldwide_Gross as TotalGross"
+  ).show()
+
+
+  val selectGoodMovies = moviesDF.select("Title", "IMDB_Rating")
+    .where(
+      col("Major_Genre") === "Comedy"
+      and
+      col("IMDB_Rating") > 6
+    )
+    .show()
 
 }
