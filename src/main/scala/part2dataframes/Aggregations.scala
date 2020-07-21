@@ -48,6 +48,52 @@ object Aggregations extends App {
 
     val avgRatingByGenre = moviesDF.groupBy(col("Major_Genre"))
       .avg("IMDB_Rating")
-      .show()
 
+
+
+    val aggByGenre = moviesDF
+      .groupBy("Major_Genre")
+      .agg(
+        count("*").as("N_Movies"),
+        avg("IMDB_Rating").as("Avg_Rating")
+      )
+      .orderBy("Avg_Rating").show()
+
+  /**
+    * 1. Sum up all profits of all the movies in the Dataframe
+    * 2. Count how many distinct directors we have
+    * 3 Show mean and std dev of US_Gross revenue
+    * 4. Compute avg IMDB rating and avg us gross revenue per director
+    */
+
+    //1.
+    val sumOfProfits = moviesDF
+        .agg(
+        sum(
+        col("US_Gross")+
+        col("Worldwide_Gross")+
+        col("US_DVD_Sales")
+        ).as("Total Sales")
+      )
+
+    //2
+    val distinctDirectors = moviesDF
+      .select(countDistinct(col("Director")))
+
+  //3 Mean and std Dev
+    val meanAndSTDDev = moviesDF
+      .select(
+        mean("US_Gross").as("Mean"),
+        stddev("US_Gross").as("StdDev")
+      )
+
+  //4
+    val avgIMDBPerDirector = moviesDF
+      .groupBy("Director")
+      .agg(
+        avg("IMDB_Rating").as("Avg_Rating"),
+        sum("US_Gross")
+      )
+      .orderBy(col("Avg_Rating").desc)
+      .show()
 }
