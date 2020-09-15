@@ -7,101 +7,60 @@ object Joins extends App {
 
   val spark = SparkSession.builder()
     .appName("Joins")
-    .config("spark.master", "local")
+    .master("local[*]")
     .getOrCreate()
 
-  val guitarsDF = spark.read
-    .option("inferSchema", "true")
-    .json("src/main/resources/data/guitars.json")
-
-  val guitaristsDF = spark.read
-    .option("inferSchema", "true")
-    .json("src/main/resources/data/guitarPlayers.json")
-
-  val bandsDF = spark.read
-    .option("inferSchema", "true")
-    .json("src/main/resources/data/bands.json")
-
-  // inner joins
-  val joinCondition = guitaristsDF.col("band") === bandsDF.col("id")
-  val guitaristsBandsDF = guitaristsDF.join(bandsDF, joinCondition, "inner")
-
-  // outer joins
-  // left outer = everything in the inner join + all the rows in the LEFT table, with nulls in where the data is missing
-  guitaristsDF.join(bandsDF, joinCondition, "left_outer")
-
-  // right outer = everything in the inner join + all the rows in the RIGHT table, with nulls in where the data is missing
-  guitaristsDF.join(bandsDF, joinCondition, "right_outer")
-
-  // outer join = everything in the inner join + all the rows in BOTH tables, with nulls in where the data is missing
-  guitaristsDF.join(bandsDF, joinCondition, "outer")
-
-  // semi-joins = everything in the left DF for which there is a row in the right DF satisfying the condition
-  guitaristsDF.join(bandsDF, joinCondition, "left_semi")
-
-  // anti-joins = everything in the left DF for which there is NO row in the right DF satisfying the condition
-  guitaristsDF.join(bandsDF, joinCondition, "left_anti")
-
-
-  // things to bear in mind
-  // guitaristsBandsDF.select("id", "band").show // this crashes
-
-  // option 1 - rename the column on which we are joining
-  guitaristsDF.join(bandsDF.withColumnRenamed("id", "band"), "band")
-
-  // option 2 - drop the dupe column
-  guitaristsBandsDF.drop(bandsDF.col("id"))
-
-  // option 3 - rename the offending column and keep the data
-  val bandsModDF = bandsDF.withColumnRenamed("id", "bandId")
-  guitaristsDF.join(bandsModDF, guitaristsDF.col("band") === bandsModDF.col("bandId"))
-
-  // using complex types
-  guitaristsDF.join(guitarsDF.withColumnRenamed("id", "guitarId"), expr("array_contains(guitars, guitarId)"))
-
-  /**
-    * Exercises
-    *
-    * 1. show all employees and their max salary
-    * 2. show all employees who were never managers
-    * 3. find the job titles of the best paid 10 employees in the company
-    */
-
-  val driver = "org.postgresql.Driver"
-  val url = "jdbc:postgresql://localhost:5432/rtjvm"
-  val user = "docker"
-  val password = "docker"
-
-  def readTable(tableName: String) = spark.read
+  val employeesDF = spark.read
     .format("jdbc")
-    .option("driver", driver)
-    .option("url", url)
-    .option("user", user)
-    .option("password", password)
-    .option("dbtable", s"public.$tableName")
+    .option("url", "jdbc:postgresql://localhost:5432/rtjvm")
+    .option("driver", "org.postgresql.Driver")
+    .option("user", "docker")
+    .option("password", "docker")
+    .option("dbtable", "employees")
     .load()
 
-  val employeesDF = readTable("employees")
-  val salariesDF = readTable("salaries")
-  val deptManagersDF = readTable("dept_manager")
-  val titlesDF = readTable("titles")
+//  val bands = spark.read
+//    .option("inferSchema", "true")
+//    .json("src/main/resources/data/bands.json")
+//
+//  val guitarPlayers = spark.read
+//    .option("inferSchema", "true")
+//    .json("src/main/resources/data/guitarPlayers.json")
+//
+//  val joinConditions = guitarPlayers.col("band") === bands.col("id")
+//  val guitaristBands = guitarPlayers.join(bands, joinConditions, "inner")
+//
+//  //joins!
+//  //inner - everything that is matched in the two tables based on the conditions
+//  //left outer - inner join plus everything from left (guitar players) table. It will fill in nulls for the right table
+//  //right outer- opposite
+//  //outer join - everything in all tables
+//  //left_semi - inner join but cut out data from right table
+//  //left_anti - the missing row from left dataframe, everything is null in right table
+//
+//  val guitaristBandsLeftOuter = guitarPlayers.join(bands, joinConditions, "left_anti")
+//
+//  val columnsRenamed = guitarPlayers.join(bands, joinConditions).drop(bands.col("id"))
+//
+//  //using complex types
+//  val arrayJoins = guitarPlayers.join(guitars.withColumnRenamed("id", "guitar_id"), expr("array_contains(guitars, guitar_id)"))
 
-  // 1
-  val maxSalariesPerEmpNoDF = salariesDF.groupBy("emp_no").agg(max("salary").as("maxSalary"))
-  val employeesSalariesDF = employeesDF.join(maxSalariesPerEmpNoDF, "emp_no")
+  /**
+    * Show all employees and their max salaries
+    * Show all employees who were never managers
+    * find the job titles of the best paid 10 employees
+    */
+    val salariesDF = spark.read
+      .format("jdbc")
+      .option("url", "jdbc:postgresql://localhost:5432/rtjvm")
+      .option("driver", "org.postgresql.Driver")
+      .option("user", "docker")
+      .option("password", "docker")
+      .option("dbtable", "salaries")
+      .load()
 
-  // 2
-  val empNeverManagersDF = employeesDF.join(
-    deptManagersDF,
-    employeesDF.col("emp_no") === deptManagersDF.col("emp_no"),
-    "left_anti"
-  )
-
-  // 3
-  val mostRecentJobTitlesDF = titlesDF.groupBy("emp_no", "title").agg(max("to_date"))
-  val bestPaidEmployeesDF = employeesSalariesDF.orderBy(col("maxSalary").desc).limit(10)
-  val bestPaidJobsDF = bestPaidEmployeesDF.join(mostRecentJobTitlesDF, "emp_no")
-
-  bestPaidJobsDF.show()
+  //Show all employees and max salaries
+  val employees = employeesDF.join(salariesDF, salariesDF.col("emp_no") === employeesDF.col("emp_no"), "inner").drop(salariesDF.col("emp_no"))
+  employees.show()
 }
 
