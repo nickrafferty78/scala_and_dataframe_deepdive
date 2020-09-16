@@ -58,9 +58,34 @@ object Joins extends App {
       .option("password", "docker")
       .option("dbtable", "salaries")
       .load()
+  val deptManagerDF = spark.read
+    .format("jdbc")
+    .option("url", "jdbc:postgresql://localhost:5432/rtjvm")
+    .option("driver", "org.postgresql.Driver")
+    .option("user", "docker")
+    .option("password", "docker")
+    .option("dbtable", "dept_manager")
+    .load()
+  val titlesDF = spark.read
+    .format("jdbc")
+    .option("url", "jdbc:postgresql://localhost:5432/rtjvm")
+    .option("driver", "org.postgresql.Driver")
+    .option("user", "docker")
+    .option("password", "docker")
+    .option("dbtable", "titles")
+    .load()
+
 
   //Show all employees and max salaries
-  val employees = employeesDF.join(salariesDF, salariesDF.col("emp_no") === employeesDF.col("emp_no"), "inner").drop(salariesDF.col("emp_no"))
-  employees.show()
+  val maxSalaryPerEmployee = salariesDF.groupBy(col("emp_no")).max("salary")
+  val joinedEmployees= maxSalaryPerEmployee.join(employeesDF, employeesDF.col("emp_no") === salariesDF.col("emp_no"), "inner").drop(employeesDF.col("emp_no"))
+
+  //Never managers
+  val neverManagers = employeesDF.join(deptManagerDF, deptManagerDF.col("emp_no")===employeesDF.col("emp_no"), "left_anti")
+
+  //
+  val mostRecentJobTitle = titlesDF.groupBy("emp_no", "title").agg(max("to_date"))
+  val bestPaidEmployees = salariesDF.orderBy(col("salary").desc).limit(10)
+  val bestPaidJobs = bestPaidEmployees.join(mostRecentJobTitle, mostRecentJobTitle.col("emp_no") === bestPaidEmployees.col("emp_no")).show()
 }
 
